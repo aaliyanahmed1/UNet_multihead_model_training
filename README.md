@@ -753,3 +753,5 @@ With 94.1% accuracy on the test set, this model demonstrates exceptional perform
 Unlike many research projects that focus only on model development, this repository provides a complete pipeline from raw data to deployed inference. It includes data preprocessing, model training with comprehensive metrics tracking, ONNX export for cross-platform deployment, and both PyTorch and ONNX inference scripts with visualization capabilities.
 
 This project serves as an excellent example of how to build, train, evaluate, and deploy a sophisticated medical AI system, making it valuable for researchers, practitioners, and students interested in medical deep learning applications.
+
+(Web Application) [https://medicalapp-nvxwpnutdybrfbujnbfed4.streamlit.app/]
