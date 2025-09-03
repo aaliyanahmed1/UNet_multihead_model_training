@@ -1,0 +1,55 @@
+{
+  "best_val_loss": 0.4469056937038599,
+  "best_val_accuracy": 0.9302763819095478,
+  "final_classification_report": {
+    "COVID": {
+      "precision": 0.9887218045112782,
+      "recall": 0.9686924493554327,
+      "f1-score": 0.9786046511627907,
+      "support": 543.0
+    },
+    "Lung_Opacity": {
+      "precision": 0.9427570093457944,
+      "recall": 0.8946784922394678,
+      "f1-score": 0.9180887372013651,
+      "support": 902.0
+    },
+    "Normal": {
+      "precision": 0.9327467001885607,
+      "recall": 0.9705689993459777,
+      "f1-score": 0.9512820512820512,
+      "support": 1529.0
+    },
+    "Viral Pneumonia": {
+      "precision": 0.9795918367346939,
+      "recall": 0.9552238805970149,
+      "f1-score": 0.9672544080604534,
+      "support": 201.0
+    },
+    "accuracy": 0.9477165354330709,
+    "macro avg": {
+      "precision": 0.9609543376950818,
+      "recall": 0.9472909553844733,
+      "f1-score": 0.9538074619266652,
+      "support": 3175.0
+    },
+    "weighted avg": {
+      "precision": 0.9481292680477207,
+      "recall": 0.9477165354330709,
+      "f1-score": 0.9475359870763571,
+      "support": 3175.0
+    }
+  },
+  "dataset_info": {
+    "total_samples": 21165,
+    "train_samples": 14815,
+    "val_samples": 3175,
+    "test_samples": 3175,
+    "class_distribution": {
+      "COVID": 3616,
+      "Lung_Opacity": 6012,
+      "Normal": 10192,
+      "Viral Pneumonia": 1345
+    }
+  }
+}

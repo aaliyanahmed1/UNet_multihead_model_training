@@ -1,0 +1,16 @@
+{
+  "class_names": [
+    "COVID",
+    "Lung_Opacity",
+    "Normal",
+    "Viral Pneumonia"
+  ],
+  "img_size": 256,
+  "normalization": "RGB, scaled to [0,1]",
+  "outputs": {
+    "segmentation": "Sigmoid probability mask (B,1,H,W)",
+    "classification": "Logits (B,C)"
+  },
+  "opset": 17,
+  "dynamic_batch": true
+}

@@ -1,0 +1,13 @@
+image_path,true_class,pred_class,prob_COVID,prob_Lung_Opacity,prob_Normal,prob_Viral Pneumonia
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/COVID/images/COVID-1966.png,COVID,COVID,0.922239,0.018958,0.056957,0.001846
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Lung_Opacity/images/Lung_Opacity-403.png,Lung_Opacity,Normal,0.000779,0.265740,0.730061,0.003420
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/COVID/images/COVID-2616.png,COVID,Lung_Opacity,0.385568,0.612241,0.000122,0.002069
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Lung_Opacity/images/Lung_Opacity-3991.png,Lung_Opacity,Lung_Opacity,0.000812,0.978229,0.020565,0.000394
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Lung_Opacity/images/Lung_Opacity-2297.png,Lung_Opacity,Lung_Opacity,0.004294,0.985149,0.010390,0.000167
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Normal/images/Normal-6440.png,Normal,Normal,0.000617,0.002338,0.996675,0.000370
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/COVID/images/COVID-927.png,COVID,COVID,0.956094,0.029165,0.014351,0.000390
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Viral Pneumonia/images/Viral Pneumonia-120.png,Viral Pneumonia,Viral Pneumonia,0.018164,0.433616,0.013556,0.534664
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Lung_Opacity/images/Lung_Opacity-2795.png,Lung_Opacity,Lung_Opacity,0.000464,0.687292,0.310551,0.001694
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Lung_Opacity/images/Lung_Opacity-4321.png,Lung_Opacity,Lung_Opacity,0.002072,0.505576,0.492163,0.000188
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/Normal/images/Normal-7935.png,Normal,Normal,0.007390,0.001208,0.991096,0.000306
+/teamspace/studios/this_studio/COVID-19_Radiography_Dataset/COVID/images/COVID-3376.png,COVID,COVID,0.998285,0.000973,0.000262,0.000480
