@@ -1,3 +1,10 @@
+"""
+ONNX Export Module for COVID-19 Multi-Task Model
+
+This module provides functionality to export trained PyTorch models to ONNX format
+for cross-platform deployment and optimized inference.
+"""
+
 import os
 import json
 import argparse
@@ -8,11 +15,27 @@ import model_arch as trainer
 
 
 class ModelWrapper(nn.Module):
+    """
+    Wrapper class for ONNX export compatibility.
+    
+    ONNX export requires models to return tuples instead of dictionaries,
+    so this wrapper converts the model's dictionary output to a tuple format.
+    """
+    
     def __init__(self, base_model: nn.Module):
         super().__init__()
         self.base_model = base_model
 
     def forward(self, x):
+        """
+        Forward pass that returns tuple for ONNX compatibility.
+        
+        Args:
+            x (torch.Tensor): Input tensor
+            
+        Returns:
+            Tuple: (segmentation_output, classification_output)
+        """
         outputs = self.base_model(x)
         # Return a tuple for ONNX export: (segmentation, classification)
         return outputs['segmentation'], outputs['classification']
@@ -26,7 +49,18 @@ def export_to_onnx(
     dynamic_batch: bool = True,
     device: str | None = None
 ) -> None:
-    # Device
+    """
+    Export trained PyTorch model to ONNX format for deployment.
+    
+    Args:
+        checkpoint_path (str): Path to the trained PyTorch checkpoint file
+        onnx_path (str): Output path for the ONNX model file
+        img_size (int): Image size used for model input (default: 256)
+        opset (int): ONNX opset version for compatibility (default: 17)
+        dynamic_batch (bool): Enable dynamic batch size for flexible inference
+        device (str | None): Device to use for export ('cuda' or 'cpu')
+    """
+    # Device selection
     torch_device = torch.device('cuda' if (device in ['cuda', None] and torch.cuda.is_available()) else 'cpu')
 
     # Load checkpoint (full dict saved by trainer)
@@ -39,15 +73,16 @@ def export_to_onnx(
     model.to(torch_device)
     model.eval()
 
+    # Wrap model for ONNX export
     wrapped = ModelWrapper(model).to(torch_device).eval()
 
-    # Dummy input
+    # Create dummy input for ONNX export
     dummy = torch.randn(1, 3, img_size, img_size, device=torch_device)
 
-    # Prepare directories
+    # Prepare output directories
     os.makedirs(os.path.dirname(onnx_path) or '.', exist_ok=True)
 
-    # Dynamic axes
+    # Configure dynamic axes for variable batch sizes
     dynamic_axes = None
     if dynamic_batch:
         dynamic_axes = {
@@ -56,7 +91,7 @@ def export_to_onnx(
             'classification': {0: 'batch'}
         }
 
-    # Export
+    # Export model to ONNX format
     torch.onnx.export(
         wrapped,
         dummy,
@@ -68,7 +103,7 @@ def export_to_onnx(
         do_constant_folding=True
     )
 
-    # Save simple metadata alongside
+    # Save metadata alongside the ONNX model
     meta = {
         'class_names': class_names,
         'img_size': img_size,
@@ -96,6 +131,7 @@ def export_to_onnx(
 
 
 def parse_args():
+    """Parse command line arguments for ONNX export."""
     parser = argparse.ArgumentParser(description='Export trained PyTorch model to ONNX')
     parser.add_argument('--checkpoint', type=str, default=os.path.join('model_checkpoints', 'best_covid_model.pth'), help='Path to trained checkpoint')
     parser.add_argument('--onnx_path', type=str, default=os.path.join('output_results', 'covid_multitask.onnx'), help='Output ONNX file path')

@@ -1,3 +1,10 @@
+"""
+PyTorch Inference Module for COVID-19 Multi-Task Model
+
+This module provides functionality to run inference using the original PyTorch model
+for COVID-19 classification and lung segmentation from chest X-ray images.
+"""
+
 import os
 import argparse
 import random
@@ -8,15 +15,26 @@ import numpy as np
 import torch
 import cv2
 
-import newonx as trainer
+import model_arch as trainer
 
 
 def ensure_dir(path: str) -> None:
+    """Ensure directory exists, create if it doesn't."""
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
 
 def find_images_in_dataset(root_dir: str, class_names: List[str]) -> List[Tuple[str, str]]:
+    """
+    Find all images in the dataset directory structure.
+    
+    Args:
+        root_dir (str): Root directory containing class subdirectories
+        class_names (List[str]): List of class names to search for
+        
+    Returns:
+        List[Tuple[str, str]]: List of (image_path, class_name) tuples
+    """
     samples: List[Tuple[str, str]] = []
     for class_name in class_names:
         images_dir = os.path.join(root_dir, class_name, 'images')
@@ -29,6 +47,16 @@ def find_images_in_dataset(root_dir: str, class_names: List[str]) -> List[Tuple[
 
 
 def preprocess_image_for_model(image_bgr: np.ndarray, size: Tuple[int, int] = (256, 256)) -> torch.Tensor:
+    """
+    Preprocess image for model inference.
+    
+    Args:
+        image_bgr (np.ndarray): Input image in BGR format
+        size (Tuple[int, int]): Target size for resizing (default: (256, 256))
+        
+    Returns:
+        torch.Tensor: Preprocessed image tensor ready for model input
+    """
     image_resized = cv2.resize(image_bgr, (size[0], size[1]))
     image_rgb = cv2.cvtColor(image_resized, cv2.COLOR_BGR2RGB)
     image_norm = image_rgb.astype(np.float32) / 255.0
@@ -38,6 +66,16 @@ def preprocess_image_for_model(image_bgr: np.ndarray, size: Tuple[int, int] = (2
 
 
 def overlay_segmentation(image_bgr: np.ndarray, pred_mask: np.ndarray) -> np.ndarray:
+    """
+    Overlay segmentation mask on the original image.
+    
+    Args:
+        image_bgr (np.ndarray): Original image in BGR format
+        pred_mask (np.ndarray): Predicted segmentation mask
+        
+    Returns:
+        np.ndarray: Image with segmentation overlay
+    """
     pred = (pred_mask[0] > 0.5).astype(np.float32)
     overlay = image_bgr.copy().astype(np.float32) / 255.0
     # Red channel for prediction
@@ -47,6 +85,16 @@ def overlay_segmentation(image_bgr: np.ndarray, pred_mask: np.ndarray) -> np.nda
 
 
 def annotate_class(overlay_bgr: np.ndarray, text: str) -> np.ndarray:
+    """
+    Add text annotation to the image.
+    
+    Args:
+        overlay_bgr (np.ndarray): Image with segmentation overlay
+        text (str): Text to add to the image
+        
+    Returns:
+        np.ndarray: Annotated image
+    """
     out = overlay_bgr.copy()
     cv2.rectangle(out, (5, 5), (5 + 300, 40), (0, 0, 0), -1)
     cv2.putText(out, text, (12, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
@@ -61,9 +109,20 @@ def run_inference(
     device: str | None = None,
     image_paths: List[str] | None = None
 ) -> None:
+    """
+    Run inference on sample images using PyTorch model.
+    
+    Args:
+        data_dir (str): Root directory containing class subfolders with images
+        checkpoint_path (str): Path to the trained PyTorch checkpoint
+        save_dir (str): Directory to save annotated results and predictions
+        num_samples (int): Number of random samples to process (default: 12)
+        device (str | None): Device for inference ('cuda' or 'cpu')
+        image_paths (List[str] | None): Specific image paths to process
+    """
     ensure_dir(save_dir)
 
-    # Device
+    # Device selection
     torch_device = torch.device('cuda' if (device in ['cuda', None] and torch.cuda.is_available()) else 'cpu')
 
     # Load checkpoint (full dict saved by trainer)

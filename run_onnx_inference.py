@@ -1,3 +1,10 @@
+"""
+ONNX Inference Module for COVID-19 Multi-Task Model
+
+This module provides functionality to run inference using the exported ONNX model
+for COVID-19 classification and lung segmentation from chest X-ray images.
+"""
+
 import os
 import argparse
 import json
@@ -10,11 +17,22 @@ import onnxruntime as ort
 
 
 def ensure_dir(path: str) -> None:
+    """Ensure directory exists, create if it doesn't."""
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
 
 def find_images_in_dataset(root_dir: str, class_names: List[str]) -> List[Tuple[str, str]]:
+    """
+    Find all images in the dataset directory structure.
+    
+    Args:
+        root_dir (str): Root directory containing class subdirectories
+        class_names (List[str]): List of class names to search for
+        
+    Returns:
+        List[Tuple[str, str]]: List of (image_path, class_name) tuples
+    """
     samples: List[Tuple[str, str]] = []
     for class_name in class_names:
         images_dir = os.path.join(root_dir, class_name, 'images')
@@ -27,6 +45,16 @@ def find_images_in_dataset(root_dir: str, class_names: List[str]) -> List[Tuple[
 
 
 def preprocess(image_bgr: np.ndarray, size: int) -> np.ndarray:
+    """
+    Preprocess image for ONNX model inference.
+    
+    Args:
+        image_bgr (np.ndarray): Input image in BGR format
+        size (int): Target size for resizing
+        
+    Returns:
+        np.ndarray: Preprocessed image array ready for ONNX model input
+    """
     image_resized = cv2.resize(image_bgr, (size, size))
     image_rgb = cv2.cvtColor(image_resized, cv2.COLOR_BGR2RGB)
     image_norm = image_rgb.astype(np.float32) / 255.0
@@ -35,6 +63,16 @@ def preprocess(image_bgr: np.ndarray, size: int) -> np.ndarray:
 
 
 def overlay_segmentation(image_bgr: np.ndarray, seg: np.ndarray) -> np.ndarray:
+    """
+    Overlay segmentation mask on the original image.
+    
+    Args:
+        image_bgr (np.ndarray): Original image in BGR format
+        seg (np.ndarray): Predicted segmentation mask
+        
+    Returns:
+        np.ndarray: Image with segmentation overlay
+    """
     pred = (seg[0] > 0.5).astype(np.float32)
     overlay = image_bgr.copy().astype(np.float32) / 255.0
     overlay[..., 2] = np.maximum(overlay[..., 2], pred)
@@ -43,6 +81,16 @@ def overlay_segmentation(image_bgr: np.ndarray, seg: np.ndarray) -> np.ndarray:
 
 
 def annotate(overlay_bgr: np.ndarray, text: str) -> np.ndarray:
+    """
+    Add text annotation to the image.
+    
+    Args:
+        overlay_bgr (np.ndarray): Image with segmentation overlay
+        text (str): Text to add to the image
+        
+    Returns:
+        np.ndarray: Annotated image
+    """
     out = overlay_bgr.copy()
     cv2.rectangle(out, (5, 5), (5 + 380, 40), (0, 0, 0), -1)
     cv2.putText(out, text, (12, 33), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
@@ -58,6 +106,18 @@ def run(
     images: List[str] | None = None,
     providers: List[str] | None = None
 ) -> None:
+    """
+    Run inference using ONNX Runtime for optimized performance.
+    
+    Args:
+        data_dir (str): Root directory containing class subfolders
+        onnx_path (str): Path to the exported ONNX model file
+        meta_path (str): Path to the ONNX metadata JSON file
+        save_dir (str): Directory to save inference results
+        num_samples (int): Number of samples to process
+        images (List[str] | None): Specific image paths to process
+        providers (List[str] | None): ONNX Runtime execution providers
+    """
     ensure_dir(save_dir)
 
     if not os.path.exists(meta_path):
@@ -68,6 +128,7 @@ def run(
     class_names: List[str] = meta['class_names']
     img_size: int = int(meta.get('img_size', 256))
 
+    # Initialize ONNX Runtime session
     sess_options = ort.SessionOptions()
     session = ort.InferenceSession(onnx_path, sess_options, providers=providers or ['CPUExecutionProvider'])
 

@@ -1,18 +1,3 @@
-# =============================================================================
-# COVID-19 Multi-Task Deep Learning Model
-# =============================================================================
-# This module implements a sophisticated multi-task deep learning model for
-# COVID-19 detection and lung segmentation from chest X-ray images.
-# 
-# Key Features:
-# - Multi-task learning: simultaneous classification and segmentation
-# - UNet backbone with dual output heads
-# - Comprehensive data preprocessing pipeline
-# - Stratified train/validation/test splitting
-# - Advanced loss function combining Dice and Cross-Entropy losses
-# - Full training pipeline with metrics tracking and visualization
-# =============================================================================
-
 import os
 import torch
 import torch.nn as nn
@@ -104,91 +89,73 @@ class COVID19Dataset(Dataset):
         """
         sample = self.data_list[idx]
         
-        # =====================================================================
-        # IMAGE LOADING AND PREPROCESSING
-        # =====================================================================
         # Load image and convert to RGB format for consistent processing
         image = Image.open(sample['image']).convert('RGB')
-        image = np.array(image).astype(np.float32)  # Convert to float32 for processing
+        image = np.array(image).astype(np.float32)
         
-        # =====================================================================
-        # MASK LOADING AND PREPROCESSING
-        # =====================================================================
         # Load segmentation mask if available, otherwise create empty mask
         if sample['mask'] and os.path.exists(sample['mask']):
-            # Load mask as grayscale image
             mask = Image.open(sample['mask']).convert('L')
             mask = np.array(mask).astype(np.float32)
             # Apply binary threshold: values > 127 become 1, others become 0
-            # This converts grayscale masks to binary segmentation masks
             mask = (mask > 127).astype(np.float32)
         else:
             # Create empty mask if no mask file is available
-            # This handles cases where segmentation masks are missing
             mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.float32)
         
-        # =====================================================================
-        # DATA AUGMENTATION AND PREPROCESSING
-        # =====================================================================
+        # Apply transforms
         if self.transform:
-            # Resize images and masks to standard size (256x256) for model input
+            # Resize images and masks to standard size
             image = cv2.resize(image, (256, 256))
             mask = cv2.resize(mask, (256, 256))
             
-            # Apply data augmentations only during training to prevent overfitting
+            # Apply augmentations for training
             if hasattr(self, 'is_training') and self.is_training:
-                # Random horizontal flip (50% probability)
-                # This augmentation helps the model generalize to different orientations
+                # Random horizontal flip
                 if np.random.random() > 0.5:
-                    image = cv2.flip(image, 1)  # Flip horizontally
-                    mask = cv2.flip(mask, 1)    # Flip mask accordingly
+                    image = cv2.flip(image, 1)
+                    mask = cv2.flip(mask, 1)
                 
-                # Random rotation (30% probability, ±10 degrees)
-                # Small rotations help the model be robust to slight orientation variations
+                # Random rotation
                 if np.random.random() > 0.7:
-                    angle = np.random.uniform(-10, 10)  # Random angle between -10 and 10 degrees
-                    center = (128, 128)  # Center of rotation (middle of 256x256 image)
-                    M = cv2.getRotationMatrix2D(center, angle, 1.0)  # Create rotation matrix
-                    image = cv2.warpAffine(image, M, (256, 256))     # Apply rotation to image
-                    mask = cv2.warpAffine(mask, M, (256, 256))       # Apply same rotation to mask
+                    angle = np.random.uniform(-10, 10)
+                    center = (128, 128)
+                    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                    image = cv2.warpAffine(image, M, (256, 256))
+                    mask = cv2.warpAffine(mask, M, (256, 256))
                 
-                # Add Gaussian noise (50% probability)
-                # Noise augmentation helps the model be robust to image quality variations
+                # Add slight noise
                 if np.random.random() > 0.5:
-                    noise = np.random.normal(0, 5, image.shape)  # Generate Gaussian noise
-                    image = np.clip(image + noise, 0, 255)       # Add noise and clip to valid range
+                    noise = np.random.normal(0, 5, image.shape)
+                    image = np.clip(image + noise, 0, 255)
         else:
-            # For validation and test sets, only resize without augmentation
-            # This ensures consistent evaluation without random variations
+            # Just resize for validation/test
             image = cv2.resize(image, (256, 256))
             mask = cv2.resize(mask, (256, 256))
         
-        # =====================================================================
-        # NORMALIZATION AND TENSOR CONVERSION
-        # =====================================================================
-        # Normalize image pixel values from [0, 255] to [0, 1] range
-        # This is crucial for neural network training stability
+        # Normalize image to [0, 1]
         image = image / 255.0
         
-        # Convert numpy arrays to PyTorch tensors
-        # Image: Convert from HWC to CHW format (channels first)
-        image = torch.tensor(image).permute(2, 0, 1).float()
-        # Mask: Add channel dimension to make it (1, H, W)
-        mask = torch.tensor(mask).unsqueeze(0).float()
-        # Class label: Convert to long tensor for classification loss
+        # Convert to tensors
+        image = torch.tensor(image).permute(2, 0, 1).float()  # CHW format
+        mask = torch.tensor(mask).unsqueeze(0).float()  # Add channel dimension
         class_label = torch.tensor(sample['class']).long()
         
-        # Return dictionary with all processed data
         return {
-            'image': image,           # Preprocessed image tensor (3, 256, 256)
-            'mask': mask,             # Preprocessed mask tensor (1, 256, 256)
-            'class': class_label,     # Class label tensor
-            'image_path': sample['image'],    # Original image path for debugging
-            'class_name': sample['class_name']  # Class name string for visualization
+            'image': image,
+            'mask': mask,
+            'class': class_label,
+            'image_path': sample['image'],
+            'class_name': sample['class_name']
         }
 
 class MultiTaskCOVIDModel(nn.Module):
-    """Enhanced Multi-task model for COVID-19 classification and segmentation"""
+    """
+    Enhanced Multi-task model for COVID-19 classification and segmentation.
+    
+    This model uses a shared UNet backbone to extract features that are then
+    processed by two specialized heads for classification and segmentation.
+    """
     
     def __init__(self, num_classes: int = 4, img_size: Tuple[int, int] = (256, 256)):
         super().__init__()
@@ -232,6 +199,18 @@ class MultiTaskCOVIDModel(nn.Module):
         )
     
     def forward(self, x):
+        """
+        Forward pass through the multi-task model.
+        
+        Args:
+            x (torch.Tensor): Input batch of images (B, 3, 256, 256)
+            
+        Returns:
+            Dict[str, torch.Tensor]: Dictionary containing:
+                - 'segmentation': Binary segmentation masks (B, 1, 256, 256)
+                - 'classification': Classification logits (B, 4)
+                - 'features': Intermediate features for visualization (B, 64, H, W)
+        """
         # Shared features
         features = self.backbone(x)
         
@@ -250,14 +229,19 @@ class MultiTaskCOVIDModel(nn.Module):
         }
 
 class MultiTaskLoss(nn.Module):
-    """Enhanced combined loss for classification and segmentation"""
+    """
+    Enhanced combined loss for classification and segmentation.
+    
+    This loss function combines Dice loss and Binary Cross-Entropy for segmentation
+    with Cross-Entropy loss for classification, weighted appropriately.
+    """
     
     def __init__(self, seg_weight: float = 1.0, cls_weight: float = 2.0, focal_alpha: float = 0.25):
         super().__init__()
         self.seg_weight = seg_weight
         self.cls_weight = cls_weight
         
-        # Enhanced segmentation loss (Dice + BCE + Focal)
+        # Enhanced segmentation loss (Dice + BCE)
         self.dice_loss = DiceLoss(sigmoid=False, squared_pred=True)
         self.bce_loss = nn.BCELoss()
         
@@ -265,6 +249,16 @@ class MultiTaskLoss(nn.Module):
         self.cls_loss = nn.CrossEntropyLoss()
     
     def forward(self, outputs, targets):
+        """
+        Compute the combined multi-task loss.
+        
+        Args:
+            outputs (Dict): Model outputs containing 'segmentation' and 'classification'
+            targets (Dict): Ground truth containing 'mask' and 'class'
+            
+        Returns:
+            Dict: Dictionary containing individual and combined losses
+        """
         # Segmentation losses
         dice_loss = self.dice_loss(outputs['segmentation'], targets['mask'])
         bce_loss = self.bce_loss(outputs['segmentation'], targets['mask'])
@@ -285,8 +279,18 @@ class MultiTaskLoss(nn.Module):
         }
 
 def prepare_dataset_splits(data_dir: str, train_ratio: float = 0.7, val_ratio: float = 0.15, test_ratio: float = 0.15):
-    """Prepare train/validation/test splits with proper stratification"""
+    """
+    Prepare train/validation/test splits with proper stratification.
     
+    Args:
+        data_dir (str): Path to dataset directory
+        train_ratio (float): Ratio for training set (default: 0.7)
+        val_ratio (float): Ratio for validation set (default: 0.15)
+        test_ratio (float): Ratio for test set (default: 0.15)
+        
+    Returns:
+        Dict: Dictionary containing train/val/test splits and metadata
+    """
     logger.info("Preparing dataset splits...")
     
     # Verify split ratios
@@ -370,8 +374,17 @@ def prepare_dataset_splits(data_dir: str, train_ratio: float = 0.7, val_ratio: f
     }
 
 def create_data_loaders(dataset_splits: Dict, batch_size: int = 16, num_workers: int = 4):
-    """Create data loaders for train/val/test"""
+    """
+    Create data loaders for train/val/test.
     
+    Args:
+        dataset_splits (Dict): Dictionary containing train/val/test data splits
+        batch_size (int): Batch size for data loaders (default: 16)
+        num_workers (int): Number of worker processes (default: 4)
+        
+    Returns:
+        Dict: Dictionary containing data loaders and datasets
+    """
     # Create datasets
     train_dataset = COVID19Dataset(dataset_splits['train'], transform=True)
     train_dataset.is_training = True  # Enable augmentations
@@ -420,8 +433,17 @@ def create_data_loaders(dataset_splits: Dict, batch_size: int = 16, num_workers:
     }
 
 def calculate_metrics(outputs, targets, class_names):
-    """Calculate comprehensive metrics"""
+    """
+    Calculate comprehensive metrics for both classification and segmentation.
     
+    Args:
+        outputs (Dict): Model outputs containing 'segmentation' and 'classification'
+        targets (Dict): Ground truth containing 'mask' and 'class'
+        class_names (List[str]): List of class names
+        
+    Returns:
+        Dict: Dictionary containing various metrics
+    """
     # Classification metrics
     cls_preds = torch.argmax(outputs['classification'], dim=1).cpu().numpy()
     cls_true = targets['class'].cpu().numpy()
