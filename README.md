@@ -906,19 +906,6 @@ python model_arch.py --data_dir dataset --batch_size 8 --num_workers 2
 - Use CUDA execution provider for GPU acceleration
 - Batch multiple images together for better throughput
 
-### System Requirements
-
-#### Minimum Requirements:
-- **CPU**: Intel i5 or AMD Ryzen 5
-- **RAM**: 8GB
-- **Storage**: 10GB free space
-- **Python**: 3.8+
-
-#### Recommended Requirements:
-- **CPU**: Intel i7 or AMD Ryzen 7
-- **RAM**: 16GB
-- **GPU**: NVIDIA RTX 3060 or better (8GB+ VRAM)
-- **Storage**: 20GB free space (SSD recommended)
 
 ## File Structure
 
