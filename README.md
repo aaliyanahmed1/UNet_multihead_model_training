@@ -1,6 +1,272 @@
-# COVID-19 Multi-Task Deep Learning Model
+# Multi-Head MONAI Deep Learning Model
 
 A state-of-the-art multi-task deep learning model for COVID-19 detection and lung segmentation from chest X-ray images. This model simultaneously performs classification and segmentation tasks, achieving **94.1% accuracy** on the test dataset.
+
+## Technical Architecture
+
+### Model Structure Overview
+
+The model is implemented using the MONAI framework and follows a multi-head architecture pattern where a shared encoder (UNet backbone) extracts features that are then processed by two specialized heads for different tasks.
+
+```python
+class MultiTaskCOVIDModel(nn.Module):
+    def __init__(self, num_classes: int = 4, img_size: Tuple[int, int] = (256, 256)):
+        super().__init__()
+        self.num_classes = num_classes
+        self.img_size = img_size
+        
+        # Shared encoder (UNet backbone)
+        self.backbone = UNet(
+            spatial_dims=2,
+            in_channels=3,
+            out_channels=64,
+            channels=(32, 64, 128, 256, 512),
+            strides=(2, 2, 2, 2),
+            num_res_units=2,
+            norm=Norm.BATCH,
+            dropout=0.1
+        )
+        
+        # Dual output heads
+        self.seg_head = nn.Sequential(...)      # Segmentation head
+        self.classifier = nn.Sequential(...)    # Classification head
+```
+
+### Shared Encoder Architecture
+
+The backbone utilizes a modified UNet architecture optimized for medical image analysis:
+
+- **Input Processing**: 3-channel RGB images (256×256 pixels)
+- **Encoder Path**: Progressive downsampling with channel expansion
+  - Level 1: 32 channels (256×256)
+  - Level 2: 64 channels (128×128) 
+  - Level 3: 128 channels (64×64)
+  - Level 4: 256 channels (32×32)
+  - Level 5: 512 channels (16×16)
+- **Decoder Path**: Progressive upsampling with channel reduction
+- **Skip Connections**: Preserve fine-grained spatial information
+- **Residual Units**: 2 residual blocks per level for better gradient flow
+- **Normalization**: Batch normalization with 0.1 dropout for regularization
+
+### Dual Output Heads
+
+#### 1. Segmentation Head
+```python
+self.seg_head = nn.Sequential(
+    nn.Conv2d(64, 32, kernel_size=3, padding=1),
+    nn.BatchNorm2d(32),
+    nn.ReLU(inplace=True),
+    nn.Conv2d(32, 1, kernel_size=1),
+    nn.Sigmoid()
+)
+```
+- **Purpose**: Generate binary masks for lung region segmentation
+- **Architecture**: 64 → 32 → 1 channels
+- **Activation**: Sigmoid for probability output (0-1 range)
+- **Output**: Binary probability mask (256×256)
+
+#### 2. Classification Head
+```python
+self.classifier = nn.Sequential(
+    nn.Dropout(0.5),
+    nn.Linear(64, 256),
+    nn.ReLU(),
+    nn.BatchNorm1d(256),
+    nn.Dropout(0.3),
+    nn.Linear(256, 128),
+    nn.ReLU(),
+    nn.BatchNorm1d(128),
+    nn.Dropout(0.2),
+    nn.Linear(128, num_classes)
+)
+```
+- **Purpose**: Classify chest X-ray images into 4 categories
+- **Architecture**: Global Average Pooling → 64 → 256 → 128 → 4
+- **Regularization**: Progressive dropout (0.5, 0.3, 0.2)
+- **Output**: Logits for 4 classes (COVID, Lung_Opacity, Normal, Viral Pneumonia)
+
+### Multi-Task Loss Function
+
+The model employs a sophisticated loss combination that balances both tasks:
+
+```python
+class MultiTaskLoss(nn.Module):
+    def __init__(self, seg_weight: float = 1.0, cls_weight: float = 2.0):
+        super().__init__()
+        self.seg_weight = seg_weight
+        self.cls_weight = cls_weight
+        
+        # Segmentation losses
+        self.dice_loss = DiceLoss(sigmoid=False, squared_pred=True)
+        self.bce_loss = nn.BCELoss()
+        
+        # Classification loss
+        self.cls_loss = nn.CrossEntropyLoss()
+    
+    def forward(self, outputs, targets):
+        # Combined segmentation loss
+        dice_loss = self.dice_loss(outputs['segmentation'], targets['mask'])
+        bce_loss = self.bce_loss(outputs['segmentation'], targets['mask'])
+        seg_loss = dice_loss + bce_loss
+        
+        # Classification loss
+        cls_loss = self.cls_loss(outputs['classification'], targets['class'])
+        
+        # Weighted combination
+        total_loss = self.seg_weight * seg_loss + self.cls_weight * cls_loss
+        return {'total_loss': total_loss, 'seg_loss': seg_loss, 'cls_loss': cls_loss}
+```
+
+**Loss Components:**
+- **Dice Loss**: Handles class imbalance in segmentation masks
+- **Binary Cross-Entropy**: Provides pixel-wise classification loss
+- **Cross-Entropy**: Standard classification loss with class weighting
+- **Weighting**: Segmentation (1.0) + Classification (2.0) for balanced learning
+
+## Dataset Preprocessing and Structure
+
+### Expected Dataset Organization
+
+The preprocessing pipeline expects the following directory structure:
+
+```
+data_dir/
+├── COVID/
+│   ├── images/          # COVID X-ray images (.png, .jpg, .jpeg)
+│   └── masks/           # Corresponding segmentation masks
+├── Lung_Opacity/
+│   ├── images/          # Lung opacity X-ray images
+│   └── masks/           # Corresponding segmentation masks
+├── Normal/
+│   ├── images/          # Normal X-ray images
+│   └── masks/           # Corresponding segmentation masks
+└── Viral Pneumonia/
+    ├── images/          # Viral pneumonia X-ray images
+    └── masks/           # Corresponding segmentation masks
+```
+
+### Data Collection and Preprocessing Pipeline
+
+#### 1. File Discovery and Organization
+```python
+def prepare_dataset_splits(data_dir: str, train_ratio: float = 0.7, val_ratio: float = 0.15, test_ratio: float = 0.15):
+    class_names = ['COVID', 'Lung_Opacity', 'Normal', 'Viral Pneumonia']
+    class_to_idx = {name: idx for idx, name in enumerate(class_names)}
+    
+    all_data = []
+    for class_name in class_names:
+        images_path = os.path.join(data_dir, class_name, 'images')
+        masks_path = os.path.join(data_dir, class_name, 'masks')
+        
+        for img_file in os.listdir(images_path):
+            if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                # Find corresponding mask file
+                mask_file = find_corresponding_mask(img_file, masks_path)
+                all_data.append({
+                    'image': img_path,
+                    'mask': mask_file,
+                    'class': class_to_idx[class_name],
+                    'class_name': class_name
+                })
+```
+
+#### 2. Stratified Data Splitting
+The code implements **stratified splitting** to maintain class distribution across all splits:
+
+```python
+# First split: Train vs (Val + Test)
+train_data, temp_data, train_labels, temp_labels = train_test_split(
+    all_data, labels,
+    test_size=(val_ratio + test_ratio),  # 0.3 (15% + 15%)
+    random_state=42,
+    stratify=labels  # Maintains class proportions
+)
+
+# Second split: Val vs Test
+val_test_ratio = val_ratio / (val_ratio + test_ratio)  # 0.5
+val_data, test_data, _, _ = train_test_split(
+    temp_data, temp_labels,
+    test_size=(1 - val_test_ratio),  # 0.5
+    random_state=42,
+    stratify=temp_labels
+)
+```
+
+**Final Split Distribution:**
+- **Training**: 70% of total data
+- **Validation**: 15% of total data  
+- **Test**: 15% of total data
+
+#### 3. Image Preprocessing Pipeline
+```python
+class COVID19Dataset(Dataset):
+    def __getitem__(self, idx):
+        # Load and convert image
+        image = Image.open(sample['image']).convert('RGB')
+        image = np.array(image).astype(np.float32)
+        
+        # Resize to standard size
+        image = cv2.resize(image, (256, 256))
+        
+        # Normalize to [0, 1] range
+        image = image / 255.0
+        
+        # Convert to tensor (CHW format)
+        image = torch.tensor(image).permute(2, 0, 1).float()
+```
+
+#### 4. Mask Preprocessing
+```python
+# Load mask (if exists)
+if sample['mask'] and os.path.exists(sample['mask']):
+    mask = Image.open(sample['mask']).convert('L')  # Grayscale
+    mask = np.array(mask).astype(np.float32)
+    # Binary threshold (values > 127 become 1, others become 0)
+    mask = (mask > 127).astype(np.float32)
+else:
+    # Create empty mask if not available
+    mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.float32)
+
+# Resize mask to match image
+mask = cv2.resize(mask, (256, 256))
+
+# Add channel dimension for tensor
+mask = torch.tensor(mask).unsqueeze(0).float()
+```
+
+#### 5. Data Augmentation (Training Only)
+The model applies augmentations only during training to prevent overfitting:
+
+```python
+if hasattr(self, 'is_training') and self.is_training:
+    # Random horizontal flip (50% probability)
+    if np.random.random() > 0.5:
+        image = cv2.flip(image, 1)
+        mask = cv2.flip(mask, 1)
+    
+    # Random rotation (30% probability, ±10 degrees)
+    if np.random.random() > 0.7:
+        angle = np.random.uniform(-10, 10)
+        center = (128, 128)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        image = cv2.warpAffine(image, M, (256, 256))
+        mask = cv2.warpAffine(mask, M, (256, 256))
+    
+    # Add Gaussian noise (50% probability)
+    if np.random.random() > 0.5:
+        noise = np.random.normal(0, 5, image.shape)
+        image = np.clip(image + noise, 0, 255)
+```
+
+### Key Preprocessing Features
+
+1. **Stratified Splitting**: Maintains class balance across all splits
+2. **Flexible Mask Handling**: Works with or without segmentation masks
+3. **Standardized Input**: All images resized to 256×256 pixels
+4. **Proper Normalization**: Images normalized to [0,1] range
+5. **Data Augmentation**: Applied only during training to prevent overfitting
+6. **Consistent Format**: All data converted to PyTorch tensors in CHW format
+7. **Binary Masks**: Segmentation masks converted to binary (0/1) values
 
 ## Model Architecture
 
