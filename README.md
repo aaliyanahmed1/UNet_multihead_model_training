@@ -1,6 +1,6 @@
-# Multi-Head Deep Learning Model
+# Multi-Head Segmentation+Classification Model
 
-A state-of-the-art multi-task deep learning model for COVID-19 detection and lung segmentation from chest X-ray images. This model simultaneously performs classification and segmentation tasks, achieving **94.1% accuracy** on the test dataset.It is trainined on "COVID-19 Radiography Database" dataset that contains 4 classes "COVID, Lung_Opacity, Normal, Viral Pneumonia
+A state-of-the-art multi-task deep learning model for COVID-19 detection and lung segmentation(masking whole detection region where pathology is detected done by model itself not any other external algorithm like Grad-SAM). from chest X-ray images. This model simultaneously performs classification and segmentation tasks, achieving **94.1% accuracy** on the test dataset.It is trainined on "COVID-19 Radiography Database" dataset that contains 4 classes "COVID, Lung_Opacity, Normal, Viral Pneumonia
 "images and coressponding masks for segmentation a well structured dataset for the required job,that lets the model to perform multitasks accurately while trained on it .
 here ia a practical example of complete implementation of whole process from data-preprocessing to training and deployment.This Documentation will guide you from start to end. it contains all the steps taken to develop this model.
 
