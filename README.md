@@ -723,7 +723,7 @@ For users who want to get started immediately:
 
 ```bash
 # 1. Clone and setup
-git clone <repository-url>
+git clone https://github.com/aaliyanahmed1/UNet_multihead_model_training
 cd UNet_multihead_model_training
 python -m venv covid_model_env
 source covid_model_env/bin/activate  # On Windows: covid_model_env\Scripts\activate
@@ -748,7 +748,7 @@ python model_arch.py --data_dir dataset --num_epochs 2 --batch_size 4
 
 ### Step 1: Clone the Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/aaliyanahmed1/UNet_multihead_model_training
 cd UNet_multihead_model_training
 ```
 
