@@ -427,6 +427,45 @@ The COVID-19 Radiography Database provides:
 | Normal | 93.1% | 96.8% | 95.0% | 1,529 |
 | Viral Pneumonia | 98.5% | 95.0% | 96.7% | 202 |
 
+### Training Results and Visualizations
+
+The model training process generated comprehensive analysis outputs that demonstrate the effectiveness of our multi-task approach:
+
+#### Training Curves
+![Training Curves](analysis_outputs/training_curves.png)
+*Comprehensive training progress showing loss curves, accuracy, and segmentation metrics over 100 epochs*
+
+#### Loss Analysis
+![Loss Curve](analysis_outputs/loss_curve.png)
+*Total loss progression showing convergence and stability during training*
+
+![Classification Loss](analysis_outputs/cls_loss_curve.png)
+*Classification loss curve demonstrating effective learning of COVID-19 categories*
+
+![Segmentation Loss](analysis_outputs/seg_loss_curve.png)
+*Segmentation loss curve showing steady improvement in lung region detection*
+
+#### Performance Metrics
+![Accuracy Curve](analysis_outputs/accuracy_curve.png)
+*Training and validation accuracy progression reaching 94.1% on test set*
+
+![Dice Score](analysis_outputs/dice_curve.png)
+*Dice coefficient progression for segmentation quality assessment*
+
+#### Model Evaluation
+![Confusion Matrix](analysis_outputs/confusion_matrix.png)
+*Detailed confusion matrix showing classification performance across all 4 classes*
+
+![ROC Curves](analysis_outputs/roc_curves.png)
+*ROC curves for each class demonstrating excellent discriminative ability*
+
+![Validation AUC](analysis_outputs/val_auc_curve.png)
+*Validation AUC progression showing consistent improvement in classification confidence*
+
+#### Sample Predictions
+![Sample Overlays](analysis_outputs/sample_overlays.png)
+*Visualization of model predictions showing both classification results and segmentation masks overlaid on original X-ray images*
+
 ### Evaluation Metrics
 The model was evaluated using comprehensive metrics:
 
@@ -442,6 +481,40 @@ The model was evaluated using comprehensive metrics:
 - **Dice Coefficient**: Overlap between predicted and ground truth masks
 - **IoU (Intersection over Union)**: Spatial overlap metric
 - **Binary Cross-Entropy**: Pixel-wise classification loss
+
+### Training Analysis Summary
+
+The analysis outputs demonstrate several key strengths of our model:
+
+1. **Stable Training**: All loss curves show smooth convergence without overfitting
+2. **Balanced Performance**: Both classification and segmentation tasks improve consistently
+3. **High Accuracy**: Achieves 94.1% accuracy with excellent per-class performance
+4. **Robust Segmentation**: Dice scores show effective lung region detection
+5. **Clinical Relevance**: Sample overlays demonstrate practical utility for medical diagnosis
+
+### Analysis Outputs Explained
+
+The `analysis_outputs/` folder contains comprehensive visualizations and metrics that provide deep insights into model performance:
+
+#### Training Monitoring Files:
+- **`training_curves.png`**: Master visualization showing all key metrics in one view
+- **`loss_curve.png`**: Total loss progression indicating training stability
+- **`cls_loss_curve.png`**: Classification-specific loss showing COVID-19 category learning
+- **`seg_loss_curve.png`**: Segmentation loss demonstrating lung region detection improvement
+- **`accuracy_curve.png`**: Accuracy progression reaching 94.1% final performance
+- **`dice_curve.png`**: Dice coefficient showing segmentation quality over time
+
+#### Model Evaluation Files:
+- **`confusion_matrix.png`**: Detailed breakdown of classification performance per class
+- **`roc_curves.png`**: ROC curves for each class showing discriminative ability
+- **`val_auc_curve.png`**: Validation AUC progression indicating confidence improvement
+- **`sample_overlays.png`**: Real-world predictions showing clinical utility
+
+#### Data Files:
+- **`metrics_epochwise.csv`**: Raw numerical data for all metrics across epochs
+- **`classification_report.json`**: Structured performance metrics in JSON format
+
+These outputs demonstrate the model's robust training process, excellent convergence properties, and clinical applicability for COVID-19 detection and lung segmentation tasks.
 
 ## Model Export and Deployment
 
@@ -855,6 +928,8 @@ UNet_multihead_model_training/
 ├── export_to_onnx.py               # ONNX export functionality
 ├── run_model_pth_inference.py      # PyTorch inference script
 ├── run_onnx_inference.py           # ONNX inference script
+├── requirements.txt                 # Python dependencies
+├── .github/workflows/build.yml     # CI/CD configuration
 ├── model_checkpoints/              # Training checkpoints and results
 │   ├── best_covid_model.pth        # Best performing model
 │   ├── training_curves.png         # Training progress visualization
@@ -862,6 +937,19 @@ UNet_multihead_model_training/
 ├── models/                         # Exported models
 │   ├── covid_multitask.onnx        # ONNX model file
 │   └── covid_multitask.onnx.meta.json  # Model metadata
+├── analysis_outputs/               # Comprehensive training analysis
+│   ├── training_curves.png         # Complete training visualization
+│   ├── loss_curve.png              # Total loss progression
+│   ├── cls_loss_curve.png          # Classification loss curve
+│   ├── seg_loss_curve.png          # Segmentation loss curve
+│   ├── accuracy_curve.png          # Accuracy progression
+│   ├── dice_curve.png              # Dice coefficient curve
+│   ├── confusion_matrix.png        # Classification confusion matrix
+│   ├── roc_curves.png              # ROC curves for all classes
+│   ├── val_auc_curve.png           # Validation AUC progression
+│   ├── sample_overlays.png         # Sample predictions visualization
+│   ├── metrics_epochwise.csv       # Detailed epoch-wise metrics
+│   └── classification_report.json  # Final classification report
 ├── output_results/                 # PyTorch inference results
 ├── onnxoutputs/                    # ONNX inference results
 └── test_results/                   # Final evaluation results
