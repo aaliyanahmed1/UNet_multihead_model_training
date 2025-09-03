@@ -1,6 +1,6 @@
 # Multi-Head Deep Learning Model
 
-A state-of-the-art multi-task deep learning model for COVID-19 detection and lung segmentation from chest X-ray images. This model simultaneously performs classification and segmentation tasks, achieving **94.1% accuracy** on the test dataset.A good example of complete implementation from data-preprocessing to training and deployment.
+A state-of-the-art multi-task deep learning model for COVID-19 detection and lung segmentation from chest X-ray images. This model simultaneously performs classification and segmentation tasks, achieving **94.1% accuracy** on the test dataset.A good example of complete implementation from data-preprocessing to training and deployment.This dDocumentation will guide you from start to end. it contains all the steps taken to develop this model.
 
 ## Technical Architecture
 
@@ -642,27 +642,208 @@ This function performs optimized inference using ONNX Runtime:
 - **Multiple Providers**: Supports CPU, CUDA, and other execution providers
 - **Memory Efficient**: Lower memory footprint during inference
 
+## Quick Start
+
+For users who want to get started immediately:
+
+```bash
+# 1. Clone and setup
+git clone <repository-url>
+cd UNet_multihead_model_training
+python -m venv covid_model_env
+source covid_model_env/bin/activate  # On Windows: covid_model_env\Scripts\activate
+
+# 2. Install dependencies
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+
+# 3. Download dataset from Kaggle and extract to 'dataset/' folder
+
+# 4. Quick test run
+python model_arch.py --data_dir dataset --num_epochs 2 --batch_size 4
+```
+
+## Local Setup Instructions
+
+### Prerequisites
+- Python 3.8 or higher
+- CUDA-compatible GPU (recommended for training)
+- At least 8GB RAM
+- 10GB free disk space
+
+### Step 1: Clone the Repository
+```bash
+git clone <repository-url>
+cd UNet_multihead_model_training
+```
+
+### Step 2: Create Virtual Environment
+```bash
+# Create virtual environment
+python -m venv covid_model_env
+
+# Activate virtual environment
+# On Windows:
+covid_model_env\Scripts\activate
+# On macOS/Linux:
+source covid_model_env/bin/activate
+```
+
+### Step 3: Install Dependencies
+```bash
+# Install PyTorch (choose appropriate version for your system)
+# For CUDA 11.8:
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# For CPU only:
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Install other requirements
+pip install -r requirements.txt
+```
+
+### Step 4: Download Dataset
+1. Download the [COVID-19 Radiography Database](https://www.kaggle.com/datasets/tawsifurrahman/covid19-radiography-database) from Kaggle
+2. Extract the dataset to a folder (e.g., `dataset/`)
+3. Ensure the folder structure matches:
+```
+dataset/
+├── COVID/
+│   ├── images/
+│   └── masks/
+├── Lung_Opacity/
+│   ├── images/
+│   └── masks/
+├── Normal/
+│   ├── images/
+│   └── masks/
+└── Viral Pneumonia/
+    ├── images/
+    └── masks/
+```
+
+### Step 5: Verify Installation
+```bash
+# Test imports
+python -c "import torch; import monai; import cv2; print('All imports successful!')"
+
+# Check CUDA availability (if using GPU)
+python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
+```
+
+### Step 6: Quick Test Run
+```bash
+# Test with a small dataset first
+python model_arch.py --data_dir dataset --num_epochs 2 --batch_size 4
+```
+
 ## Usage Examples
 
 ### Training the Model
 ```bash
-python model_arch.py --data_dir /path/to/dataset --num_epochs 100 --batch_size 16
+# Full training (recommended settings)
+python model_arch.py --data_dir /path/to/dataset --num_epochs 100 --batch_size 16 --learning_rate 1e-4
+
+# Quick training for testing
+python model_arch.py --data_dir /path/to/dataset --num_epochs 10 --batch_size 8
 ```
 
 ### Exporting to ONNX
 ```bash
+# Export trained model to ONNX
 python export_to_onnx.py --checkpoint model_checkpoints/best_covid_model.pth --onnx_path models/covid_multitask.onnx
+
+# Export with custom settings
+python export_to_onnx.py --checkpoint model_checkpoints/best_covid_model.pth --onnx_path models/covid_multitask.onnx --img_size 256 --opset 17
 ```
 
 ### PyTorch Inference
 ```bash
+# Run inference with PyTorch model
 python run_model_pth_inference.py --data_dir /path/to/dataset --checkpoint model_checkpoints/best_covid_model.pth --save_dir output_results
+
+# Run inference on specific images
+python run_model_pth_inference.py --data_dir /path/to/dataset --checkpoint model_checkpoints/best_covid_model.pth --save_dir output_results --num_samples 5
 ```
 
 ### ONNX Inference
 ```bash
-python run_onnx_inference.py --data_dir /path/to/dataset --onnx_path models/covid_multitask.onnx --save_dir onnxoutputs --use_cuda
+# Run inference with ONNX model
+python run_onnx_inference.py --data_dir /path/to/dataset --onnx_path models/covid_multitask.onnx --meta_path models/covid_multitask.onnx.meta.json --save_dir onnxoutputs --num_samples 12
+
+# Run with CUDA acceleration
+python run_onnx_inference.py --data_dir /path/to/dataset --onnx_path models/covid_multitask.onnx --meta_path models/covid_multitask.onnx.meta.json --save_dir onnxoutputs --num_samples 12 --use_cuda
 ```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### 1. CUDA Out of Memory
+```bash
+# Reduce batch size
+python model_arch.py --data_dir dataset --batch_size 4
+
+# Use CPU instead
+python model_arch.py --data_dir dataset --device cpu
+```
+
+#### 2. Import Errors
+```bash
+# Reinstall requirements
+pip install --upgrade -r requirements.txt
+
+# Check Python version
+python --version  # Should be 3.8+
+```
+
+#### 3. Dataset Path Issues
+```bash
+# Verify dataset structure
+ls dataset/COVID/images/  # Should show image files
+ls dataset/COVID/masks/   # Should show mask files
+```
+
+#### 4. ONNX Runtime Issues
+```bash
+# Install ONNX Runtime with CUDA support
+pip install onnxruntime-gpu
+
+# Or CPU-only version
+pip install onnxruntime
+```
+
+#### 5. Memory Issues During Training
+```bash
+# Reduce batch size and number of workers
+python model_arch.py --data_dir dataset --batch_size 8 --num_workers 2
+```
+
+### Performance Optimization Tips
+
+#### For Training:
+- Use GPU with at least 8GB VRAM for optimal performance
+- Adjust batch size based on available memory
+- Use mixed precision training for faster training (modify code if needed)
+
+#### For Inference:
+- ONNX Runtime is typically 2-3x faster than PyTorch
+- Use CUDA execution provider for GPU acceleration
+- Batch multiple images together for better throughput
+
+### System Requirements
+
+#### Minimum Requirements:
+- **CPU**: Intel i5 or AMD Ryzen 5
+- **RAM**: 8GB
+- **Storage**: 10GB free space
+- **Python**: 3.8+
+
+#### Recommended Requirements:
+- **CPU**: Intel i7 or AMD Ryzen 7
+- **RAM**: 16GB
+- **GPU**: NVIDIA RTX 3060 or better (8GB+ VRAM)
+- **Storage**: 20GB free space (SSD recommended)
 
 ## File Structure
 
