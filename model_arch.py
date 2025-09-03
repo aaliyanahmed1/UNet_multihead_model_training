@@ -1,3 +1,18 @@
+# =============================================================================
+# COVID-19 Multi-Task Deep Learning Model
+# =============================================================================
+# This module implements a sophisticated multi-task deep learning model for
+# COVID-19 detection and lung segmentation from chest X-ray images.
+# 
+# Key Features:
+# - Multi-task learning: simultaneous classification and segmentation
+# - UNet backbone with dual output heads
+# - Comprehensive data preprocessing pipeline
+# - Stratified train/validation/test splitting
+# - Advanced loss function combining Dice and Cross-Entropy losses
+# - Full training pipeline with metrics tracking and visualization
+# =============================================================================
+
 import os
 import torch
 import torch.nn as nn
@@ -16,97 +31,160 @@ from typing import Dict, Tuple, List
 import warnings
 warnings.filterwarnings('ignore')
 
-# MONAI imports
+# MONAI (Medical Open Network for AI) imports for medical image processing
 import monai
-from monai.networks.nets import UNet
-from monai.networks.layers import Norm
-from monai.losses import DiceLoss, DiceCELoss
-from monai.metrics import DiceMetric
-from monai.transforms import (
+from monai.networks.nets import UNet  # U-Net architecture for medical segmentation
+from monai.networks.layers import Norm  # Normalization layers
+from monai.losses import DiceLoss, DiceCELoss  # Dice loss for segmentation
+from monai.metrics import DiceMetric  # Dice coefficient metric
+from monai.transforms import (  # Data augmentation transforms
     Compose, LoadImage, AddChannel, ScaleIntensity, RandRotate90,
     RandFlip, RandGaussianNoise, Resize, ToTensor, RandAffine,
     RandGaussianSmooth, RandAdjustContrast
 )
 
-# Set up logging
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+# Configure logging for training progress tracking and debugging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# CUSTOM DATASET CLASS
+# =============================================================================
 class COVID19Dataset(Dataset):
-    """Custom dataset for COVID-19 classification and segmentation with proper splits"""
+    """
+    Custom PyTorch Dataset for COVID-19 chest X-ray classification and segmentation.
+    
+    This dataset handles:
+    - Loading chest X-ray images and corresponding segmentation masks
+    - Image preprocessing (resizing, normalization)
+    - Data augmentation during training
+    - Proper tensor conversion for PyTorch models
+    
+    Args:
+        data_list (List[Dict]): List of dictionaries containing image paths, mask paths,
+                               class labels, and class names
+        transform (bool, optional): Whether to apply data augmentation transforms
+    
+    Attributes:
+        data_list (List[Dict]): List of data samples
+        transform (bool): Flag for applying transforms
+        class_names (List[str]): List of class names
+        class_to_idx (Dict[str, int]): Mapping from class names to indices
+    """
     
     def __init__(self, data_list: List[Dict], transform=None):
         self.data_list = data_list
         self.transform = transform
         
-        # Class mapping
+        # Define class mapping for 4-class COVID-19 classification
         self.class_names = ['COVID', 'Lung_Opacity', 'Normal', 'Viral Pneumonia']
         self.class_to_idx = {name: idx for idx, name in enumerate(self.class_names)}
         
     def __len__(self):
+        """Return the total number of samples in the dataset."""
         return len(self.data_list)
     
     def __getitem__(self, idx):
+        """
+        Get a single sample from the dataset.
+        
+        Args:
+            idx (int): Index of the sample to retrieve
+            
+        Returns:
+            Dict: Dictionary containing:
+                - 'image': Preprocessed image tensor (3, 256, 256)
+                - 'mask': Preprocessed mask tensor (1, 256, 256)
+                - 'class': Class label tensor
+                - 'image_path': Original image path
+                - 'class_name': Class name string
+        """
         sample = self.data_list[idx]
         
-        # Load image
+        # =====================================================================
+        # IMAGE LOADING AND PREPROCESSING
+        # =====================================================================
+        # Load image and convert to RGB format for consistent processing
         image = Image.open(sample['image']).convert('RGB')
-        image = np.array(image).astype(np.float32)
+        image = np.array(image).astype(np.float32)  # Convert to float32 for processing
         
-        # Load mask (if exists)
+        # =====================================================================
+        # MASK LOADING AND PREPROCESSING
+        # =====================================================================
+        # Load segmentation mask if available, otherwise create empty mask
         if sample['mask'] and os.path.exists(sample['mask']):
+            # Load mask as grayscale image
             mask = Image.open(sample['mask']).convert('L')
             mask = np.array(mask).astype(np.float32)
-            # Normalize mask to 0-1
-            mask = (mask > 127).astype(np.float32)  # Binary threshold
+            # Apply binary threshold: values > 127 become 1, others become 0
+            # This converts grayscale masks to binary segmentation masks
+            mask = (mask > 127).astype(np.float32)
         else:
-            # Create empty mask if not available
+            # Create empty mask if no mask file is available
+            # This handles cases where segmentation masks are missing
             mask = np.zeros((image.shape[0], image.shape[1]), dtype=np.float32)
         
-        # Apply transforms
+        # =====================================================================
+        # DATA AUGMENTATION AND PREPROCESSING
+        # =====================================================================
         if self.transform:
-            # Resize images and masks to standard size
+            # Resize images and masks to standard size (256x256) for model input
             image = cv2.resize(image, (256, 256))
             mask = cv2.resize(mask, (256, 256))
             
-            # Apply augmentations for training
+            # Apply data augmentations only during training to prevent overfitting
             if hasattr(self, 'is_training') and self.is_training:
-                # Random horizontal flip
+                # Random horizontal flip (50% probability)
+                # This augmentation helps the model generalize to different orientations
                 if np.random.random() > 0.5:
-                    image = cv2.flip(image, 1)
-                    mask = cv2.flip(mask, 1)
+                    image = cv2.flip(image, 1)  # Flip horizontally
+                    mask = cv2.flip(mask, 1)    # Flip mask accordingly
                 
-                # Random rotation
+                # Random rotation (30% probability, ±10 degrees)
+                # Small rotations help the model be robust to slight orientation variations
                 if np.random.random() > 0.7:
-                    angle = np.random.uniform(-10, 10)
-                    center = (128, 128)
-                    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-                    image = cv2.warpAffine(image, M, (256, 256))
-                    mask = cv2.warpAffine(mask, M, (256, 256))
+                    angle = np.random.uniform(-10, 10)  # Random angle between -10 and 10 degrees
+                    center = (128, 128)  # Center of rotation (middle of 256x256 image)
+                    M = cv2.getRotationMatrix2D(center, angle, 1.0)  # Create rotation matrix
+                    image = cv2.warpAffine(image, M, (256, 256))     # Apply rotation to image
+                    mask = cv2.warpAffine(mask, M, (256, 256))       # Apply same rotation to mask
                 
-                # Add slight noise
+                # Add Gaussian noise (50% probability)
+                # Noise augmentation helps the model be robust to image quality variations
                 if np.random.random() > 0.5:
-                    noise = np.random.normal(0, 5, image.shape)
-                    image = np.clip(image + noise, 0, 255)
+                    noise = np.random.normal(0, 5, image.shape)  # Generate Gaussian noise
+                    image = np.clip(image + noise, 0, 255)       # Add noise and clip to valid range
         else:
-            # Just resize for validation/test
+            # For validation and test sets, only resize without augmentation
+            # This ensures consistent evaluation without random variations
             image = cv2.resize(image, (256, 256))
             mask = cv2.resize(mask, (256, 256))
         
-        # Normalize image to [0, 1]
+        # =====================================================================
+        # NORMALIZATION AND TENSOR CONVERSION
+        # =====================================================================
+        # Normalize image pixel values from [0, 255] to [0, 1] range
+        # This is crucial for neural network training stability
         image = image / 255.0
         
-        # Convert to tensors
-        image = torch.tensor(image).permute(2, 0, 1).float()  # CHW format
-        mask = torch.tensor(mask).unsqueeze(0).float()  # Add channel dimension
+        # Convert numpy arrays to PyTorch tensors
+        # Image: Convert from HWC to CHW format (channels first)
+        image = torch.tensor(image).permute(2, 0, 1).float()
+        # Mask: Add channel dimension to make it (1, H, W)
+        mask = torch.tensor(mask).unsqueeze(0).float()
+        # Class label: Convert to long tensor for classification loss
         class_label = torch.tensor(sample['class']).long()
         
+        # Return dictionary with all processed data
         return {
-            'image': image,
-            'mask': mask,
-            'class': class_label,
-            'image_path': sample['image'],
-            'class_name': sample['class_name']
+            'image': image,           # Preprocessed image tensor (3, 256, 256)
+            'mask': mask,             # Preprocessed mask tensor (1, 256, 256)
+            'class': class_label,     # Class label tensor
+            'image_path': sample['image'],    # Original image path for debugging
+            'class_name': sample['class_name']  # Class name string for visualization
         }
 
 class MultiTaskCOVIDModel(nn.Module):
