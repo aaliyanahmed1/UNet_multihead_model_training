@@ -667,7 +667,7 @@ python run_onnx_inference.py --data_dir /path/to/dataset --onnx_path models/covi
 ## File Structure
 
 ```
-lightining_work/
+UNet_multihead_model_training/
 ├── model_arch.py                    # Main training script with model architecture
 ├── export_to_onnx.py               # ONNX export functionality
 ├── run_model_pth_inference.py      # PyTorch inference script
@@ -703,13 +703,6 @@ lightining_work/
 - **ONNX Runtime**: Cross-platform inference engine
 - **ONNX**: Model format specification
 
-## Technical Specifications
-
-- **Input Format**: RGB images, 256×256 pixels, normalized to [0,1]
-- **Model Size**: ~15M parameters
-- **Training Time**: ~4-6 hours on GPU (100 epochs)
-- **Inference Speed**: ~50ms per image (GPU), ~200ms per image (CPU)
-- **Memory Usage**: ~2GB GPU memory during training, ~500MB during inference
 
 ## Performance Highlights
 
@@ -721,18 +714,7 @@ lightining_work/
 
 This model represents a significant advancement in automated COVID-19 detection from chest X-rays, providing both diagnostic classification and anatomical segmentation capabilities in a single, efficient architecture.
 
-## Dataset Citation
-
-If you use this model in your research, please cite the original dataset:
-
-```
-COVID-19 Radiography Database
-https://www.kaggle.com/datasets/tawsifurrahman/covid19-radiography-database
-```
-
-The COVID-19 Radiography Database is a valuable resource for medical AI research, providing high-quality chest X-ray images with expert annotations for both classification and segmentation tasks.
-
-## Repository Summary
+## Summary
 
 This repository represents a complete, production-ready implementation of a state-of-the-art multi-task deep learning system for COVID-19 detection and lung segmentation from chest X-ray images. The project demonstrates a comprehensive approach to medical AI, from data preprocessing and model architecture design to training, evaluation, and deployment.
 
