@@ -432,38 +432,38 @@ The COVID-19 Radiography Database provides:
 The model training process generated comprehensive analysis outputs that demonstrate the effectiveness of our multi-task approach:
 
 #### Training Curves
-![Training Curves](analysis_outputs/training_curves.png)
+![Training Curves](metrices_outputs/training_curves.png)
 *Comprehensive training progress showing loss curves, accuracy, and segmentation metrics over 100 epochs*
 
 #### Loss Analysis
-![Loss Curve](analysis_outputs/loss_curve.png)
+![Loss Curve](metrices_outputs/loss_curve.png)
 *Total loss progression showing convergence and stability during training*
 
-![Classification Loss](analysis_outputs/cls_loss_curve.png)
+![Classification Loss](metrices_outputs/cls_loss_curve.png)
 *Classification loss curve demonstrating effective learning of COVID-19 categories*
 
-![Segmentation Loss](analysis_outputs/seg_loss_curve.png)
+![Segmentation Loss](metrices_outputs/seg_loss_curve.png)
 *Segmentation loss curve showing steady improvement in lung region detection*
 
 #### Performance Metrics
-![Accuracy Curve](analysis_outputs/accuracy_curve.png)
+![Accuracy Curve](metrices_outputs/accuracy_curve.png)
 *Training and validation accuracy progression reaching 94.1% on test set*
 
-![Dice Score](analysis_outputs/dice_curve.png)
+![Dice Score](metrices_outputs/dice_curve.png)
 *Dice coefficient progression for segmentation quality assessment*
 
 #### Model Evaluation
-![Confusion Matrix](analysis_outputs/confusion_matrix.png)
+![Confusion Matrix](metrices_outputs/confusion_matrix.png)
 *Detailed confusion matrix showing classification performance across all 4 classes*
 
-![ROC Curves](analysis_outputs/roc_curves.png)
+![ROC Curves](metrices_outputs/roc_curves.png)
 *ROC curves for each class demonstrating excellent discriminative ability*
 
-![Validation AUC](analysis_outputs/val_auc_curve.png)
+![Validation AUC](metrices_outputs/val_auc_curve.png)
 *Validation AUC progression showing consistent improvement in classification confidence*
 
 #### Sample Predictions
-![Sample Overlays](analysis_outputs/sample_overlays.png)
+![Sample Overlays](metrices_outputs/sample_overlays.png)
 *Visualization of model predictions showing both classification results and segmentation masks overlaid on original X-ray images*
 
 ### Evaluation Metrics
@@ -494,7 +494,7 @@ The analysis outputs demonstrate several key strengths of our model:
 
 ### Analysis Outputs Explained
 
-The `analysis_outputs/` folder contains comprehensive visualizations and metrics that provide deep insights into model performance:
+The `metrices_outputs/` folder contains comprehensive visualizations and metrics that provide deep insights into model performance:
 
 #### Training Monitoring Files:
 - **`training_curves.png`**: Master visualization showing all key metrics in one view
@@ -924,7 +924,7 @@ UNet_multihead_model_training/
 ├── models/                         # Exported models
 │   ├── covid_multitask.onnx        # ONNX model file
 │   └── covid_multitask.onnx.meta.json  # Model metadata
-├── analysis_outputs/               # Comprehensive training analysis
+├── metrices_outputs/               # Comprehensive training analysis
 │   ├── training_curves.png         # Complete training visualization
 │   ├── loss_curve.png              # Total loss progression
 │   ├── cls_loss_curve.png          # Classification loss curve
