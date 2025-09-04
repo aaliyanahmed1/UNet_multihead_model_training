@@ -6,6 +6,158 @@ here ia a practical example of complete implementation of whole process from dat
 
 ## Technical Architecture
 
+### Model Structure Overview
+
+The model is implemented using the MONAI framework and follows a multi-head architecture pattern where a shared encoder (UNet backbone) extracts features that are then processed by two specialized heads for different tasks.
+
+```python
+class MultiTaskCOVIDModel(nn.Module):
+    def __init__(self, num_classes: int = 4, img_size: Tuple[int, int] = (256, 256)):
+        super().__init__()
+        self.num_classes = num_classes
+        self.img_size = img_size
+        
+        # Shared encoder (UNet backbone)
+        self.backbone = UNet(
+            spatial_dims=2,                    # 2D images (height, width)
+            in_channels=3,                     # RGB input channels
+            out_channels=64,                   # Output feature channels
+            channels=(32, 64, 128, 256, 512), # Progressive channel expansion
+            strides=(2, 2, 2, 2),             # Downsampling at each level
+            num_res_units=2,                  # Residual blocks per level
+            norm=Norm.BATCH,                  # Batch normalization
+            dropout=0.1                       # Dropout for regularization
+        )
+        
+        # Dual output heads
+        self.seg_head = nn.Sequential(...)      # Segmentation head
+        self.classifier = nn.Sequential(...)    # Classification head
+```
+
+**Code Explanation:**
+This defines the main model class that inherits from PyTorch's `nn.Module`. The constructor initializes:
+- **Shared Backbone**: A UNet architecture that processes 3-channel RGB images and outputs 64-channel feature maps
+- **Channel Progression**: Starts with 32 channels and doubles at each level (32→64→128→256→512)
+- **Stride Configuration**: Each stride of 2 reduces spatial dimensions by half, creating a hierarchical feature pyramid
+- **Residual Units**: 2 residual blocks per level help with gradient flow and training stability
+- **Regularization**: Batch normalization and 10% dropout prevent overfitting
+
+### Shared Encoder Architecture
+
+The backbone utilizes a modified UNet architecture optimized for medical image analysis:
+
+- **Input Processing**: 3-channel RGB images (256×256 pixels)
+- **Encoder Path**: Progressive downsampling with channel expansion
+  - Level 1: 32 channels (256×256)
+  - Level 2: 64 channels (128×128) 
+  - Level 3: 128 channels (64×64)
+  - Level 4: 256 channels (32×32)
+  - Level 5: 512 channels (16×16)
+- **Decoder Path**: Progressive upsampling with channel reduction
+- **Skip Connections**: Preserve fine-grained spatial information
+- **Residual Units**: 2 residual blocks per level for better gradient flow
+- **Normalization**: Batch normalization with 0.1 dropout for regularization
+
+### Dual Output Heads
+
+#### 1. Segmentation Head
+```python
+self.seg_head = nn.Sequential(
+    nn.Conv2d(64, 32, kernel_size=3, padding=1),  # 64→32 channels, 3x3 conv
+    nn.BatchNorm2d(32),                          # Normalize 32 channels
+    nn.ReLU(inplace=True),                       # ReLU activation (memory efficient)
+    nn.Conv2d(32, 1, kernel_size=1),             # 32→1 channel, 1x1 conv
+    nn.Sigmoid()                                 # Sigmoid for 0-1 probability
+)
+```
+
+**Code Explanation:**
+The segmentation head processes the 64-channel feature maps from the backbone:
+- **First Conv Layer**: Reduces channels from 64 to 32 using a 3×3 kernel with padding to maintain spatial dimensions
+- **Batch Normalization**: Stabilizes training by normalizing the 32 feature channels
+- **ReLU Activation**: Introduces non-linearity and uses `inplace=True` to save memory
+- **Second Conv Layer**: Final 1×1 convolution reduces 32 channels to 1 (binary mask)
+- **Sigmoid Activation**: Converts raw outputs to probabilities between 0 and 1 for binary segmentation
+- **Purpose**: Generate binary masks for lung region segmentation
+- **Architecture**: 64 → 32 → 1 channels
+- **Activation**: Sigmoid for probability output (0-1 range)
+- **Output**: Binary probability mask (256×256)
+
+#### 2. Classification Head
+```python
+self.classifier = nn.Sequential(
+    nn.Dropout(0.5),                    # 50% dropout for strong regularization
+    nn.Linear(64, 256),                 # Expand from 64 to 256 features
+    nn.ReLU(),                          # ReLU activation
+    nn.BatchNorm1d(256),                # Normalize 256 features
+    nn.Dropout(0.3),                    # 30% dropout
+    nn.Linear(256, 128),                # Reduce to 128 features
+    nn.ReLU(),                          # ReLU activation
+    nn.BatchNorm1d(128),                # Normalize 128 features
+    nn.Dropout(0.2),                    # 20% dropout
+    nn.Linear(128, num_classes)         # Final layer: 128 → 4 classes
+)
+```
+
+**Code Explanation:**
+The classification head processes globally pooled features through a fully connected network:
+- **Progressive Dropout**: Starts with 50% dropout and gradually reduces (50%→30%→20%) to prevent overfitting
+- **Feature Expansion**: First layer expands from 64 to 256 features to capture complex patterns
+- **Feature Reduction**: Gradually reduces to 128 features before final classification
+- **Batch Normalization**: Applied after each linear layer to stabilize training
+- **Final Layer**: Outputs raw logits for 4 classes (no activation, as CrossEntropyLoss handles softmax)
+- **Purpose**: Classify chest X-ray images into 4 categories
+- **Architecture**: Global Average Pooling → 64 → 256 → 128 → 4
+- **Regularization**: Progressive dropout (0.5, 0.3, 0.2)
+- **Output**: Logits for 4 classes (COVID, Lung_Opacity, Normal, Viral Pneumonia)
+
+### Multi-Task Loss Function
+
+The model employs a sophisticated loss combination that balances both tasks:
+
+```python
+class MultiTaskLoss(nn.Module):
+    def __init__(self, seg_weight: float = 1.0, cls_weight: float = 2.0):
+        super().__init__()
+        self.seg_weight = seg_weight      # Weight for segmentation loss
+        self.cls_weight = cls_weight      # Weight for classification loss
+        
+        # Segmentation losses
+        self.dice_loss = DiceLoss(sigmoid=False, squared_pred=True)  # Dice coefficient loss
+        self.bce_loss = nn.BCELoss()                                 # Binary cross-entropy loss
+        
+        # Classification loss
+        self.cls_loss = nn.CrossEntropyLoss()                        # Multi-class cross-entropy
+    
+    def forward(self, outputs, targets):
+        # Combined segmentation loss
+        dice_loss = self.dice_loss(outputs['segmentation'], targets['mask'])
+        bce_loss = self.bce_loss(outputs['segmentation'], targets['mask'])
+        seg_loss = dice_loss + bce_loss                              # Combine both segmentation losses
+        
+        # Classification loss
+        cls_loss = self.cls_loss(outputs['classification'], targets['class'])
+        
+        # Weighted combination
+        total_loss = self.seg_weight * seg_loss + self.cls_weight * cls_loss
+        return {'total_loss': total_loss, 'seg_loss': seg_loss, 'cls_loss': cls_loss}
+```
+
+**Code Explanation:**
+This custom loss function combines multiple loss components for multi-task learning:
+- **Dice Loss**: Measures overlap between predicted and ground truth masks, handles class imbalance well
+- **BCE Loss**: Provides pixel-wise binary classification loss for segmentation
+- **Combined Segmentation Loss**: `dice_loss + bce_loss` leverages both overlap and pixel-wise accuracy
+- **Cross-Entropy Loss**: Standard multi-class classification loss for the 4 COVID categories
+- **Weighted Combination**: `1.0 × seg_loss + 2.0 × cls_loss` gives more importance to classification
+- **Return Dictionary**: Provides individual losses for monitoring and debugging during training
+
+**Loss Components:**
+- **Dice Loss**: Handles class imbalance in segmentation masks
+- **Binary Cross-Entropy**: Provides pixel-wise classification loss
+- **Cross-Entropy**: Standard classification loss with class weighting
+- **Weighting**: Segmentation (1.0) + Classification (2.0) for balanced learning
+
 ## X-Ray Image Validation
 
 The inference scripts include a comprehensive X-ray validation system that ensures only valid chest X-ray images are processed. This validation helps prevent false predictions and improves the reliability of the model.
@@ -59,8 +211,6 @@ When invalid images are detected, the inference scripts:
 - **Better User Experience**: Clear feedback on why images are rejected
 - **Quality Assurance**: Ensures only appropriate medical images are processed
 - **Robust Processing**: Handles various image types gracefully
-
-### Model Structure Overview
 
 The model is implemented using the MONAI framework and follows a multi-head architecture pattern where a shared encoder (UNet backbone) extracts features that are then processed by two specialized heads for different tasks.
 
