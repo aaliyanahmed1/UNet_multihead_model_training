@@ -9,13 +9,111 @@ import os
 import argparse
 import random
 import csv
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
 import torch
 import cv2
 
 import model_arch as trainer
+
+
+def is_xray_like(image_bgr: Optional[np.ndarray]) -> Tuple[bool, str]:
+    """Validate if image appears to be a chest X-ray with balanced criteria.
+    
+    Args:
+        image_bgr: Input BGR image or None
+        
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if image_bgr is None:
+        return False, "Failed to read the image file."
+    
+    # Check image dimensions
+    h, w = image_bgr.shape[:2]
+    if min(h, w) < 256:
+        return False, "Image is too small. Minimum dimension should be 256 pixels for X-ray analysis."
+    
+    # Convert to grayscale for analysis
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    
+    # 1. Check if image is actually grayscale (not just black and white)
+    # Calculate color channel differences
+    b, g, r = cv2.split(image_bgr.astype(np.float32))
+    diff_bg = np.mean(np.abs(b - g))
+    diff_br = np.mean(np.abs(b - r))
+    diff_gr = np.mean(np.abs(g - r))
+    avg_diff = (diff_bg + diff_br + diff_gr) / 3.0
+    
+    if avg_diff > 8.0:  # Increased from 5.0 to allow for slight color variations
+        return False, "Image appears to be colorful. X-ray images must be grayscale."
+    
+    # 2. Check for X-ray specific characteristics with more lenient ranges
+    # X-rays should have specific intensity distribution
+    mean_intensity = np.mean(gray)
+    std_intensity = np.std(gray)
+    
+    # More lenient brightness range for different X-ray types
+    if mean_intensity < 20 or mean_intensity > 240:  # Widened from 30-225
+        return False, f"Image brightness ({mean_intensity:.1f}) is outside X-ray range (20-240)."
+    
+    if std_intensity < 8:  # Reduced from 15 to allow lighter X-rays
+        return False, f"Image contrast ({std_intensity:.1f}) is too low for X-ray. X-rays need some contrast."
+    
+    # 3. Check for X-ray anatomical features with lower threshold
+    # X-rays should have some lung-like patterns (not just uniform)
+    # Calculate local variance to detect anatomical structures
+    kernel = np.ones((8, 8), np.float32) / 64
+    local_mean = cv2.filter2D(gray.astype(np.float32), -1, kernel)
+    local_variance = cv2.filter2D((gray.astype(np.float32) - local_mean)**2, -1, kernel)
+    avg_local_variance = np.mean(local_variance)
+    
+    if avg_local_variance < 20:  # Reduced from 50 to allow lighter X-rays
+        return False, "Image lacks anatomical detail. X-rays should show lung structures and ribs."
+    
+    # 4. Check for X-ray specific intensity patterns with lower entropy threshold
+    # X-rays have characteristic histogram distribution
+    hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+    hist_norm = hist.flatten() / np.sum(hist)
+    
+    # Check if histogram has proper X-ray distribution (not too uniform, not too peaked)
+    entropy = -np.sum(hist_norm * np.log2(hist_norm + 1e-10))
+    if entropy < 3.0:  # Reduced from 4.0 to allow lighter X-rays
+        return False, "Image histogram is too uniform. X-rays have characteristic intensity distribution."
+    
+    # 5. Check for rib-like structures with lower threshold
+    # Apply edge detection to find potential rib structures
+    edges = cv2.Canny(gray, 30, 100)  # Lowered thresholds for lighter X-rays
+    horizontal_kernel = np.array([[1, 1, 1, 1, 1]], np.uint8)
+    horizontal_lines = cv2.morphologyEx(edges, cv2.MORPH_OPEN, horizontal_kernel)
+    
+    # Count horizontal line pixels
+    horizontal_pixels = np.sum(horizontal_lines > 0)
+    total_pixels = gray.size
+    
+    if horizontal_pixels / total_pixels < 0.0005:  # Reduced from 0.001
+        return False, "No rib-like structures detected. X-rays should show rib outlines."
+    
+    # 6. Check for lung field characteristics with more lenient thresholds
+    # X-rays should have darker lung areas and brighter bone areas
+    # Calculate ratio of dark to bright areas
+    dark_threshold = np.percentile(gray, 25)  # Changed from 30
+    bright_threshold = np.percentile(gray, 75)  # Changed from 70
+    
+    dark_pixels = np.sum(gray < dark_threshold)
+    bright_pixels = np.sum(gray > bright_threshold)
+    
+    if dark_pixels / total_pixels < 0.05 or bright_pixels / total_pixels < 0.05:  # Reduced from 0.1
+        return False, "Image lacks proper X-ray contrast between lung fields and bones."
+    
+    # 7. Final check: Ensure it's not just a simple black and white image
+    # Check for intermediate gray values (X-rays have many gray levels)
+    unique_values = len(np.unique(gray))
+    if unique_values < 50:  # Reduced from 100 to allow lighter X-rays
+        return False, f"Image has too few gray levels ({unique_values}). X-rays have continuous gray scale."
+    
+    return True, ""
 
 
 def ensure_dir(path: str) -> None:
@@ -159,6 +257,12 @@ def run_inference(
             image_bgr = cv2.imread(img_path)
             if image_bgr is None:
                 print(f'Skipping unreadable image: {img_path}')
+                continue
+
+            # Validate if image is X-ray like
+            is_valid, error_msg = is_xray_like(image_bgr)
+            if not is_valid:
+                print(f'Invalid X-ray image: {img_path} - {error_msg}')
                 continue
 
             # Keep original-sized for overlay; also prepare model input size
