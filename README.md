@@ -158,60 +158,6 @@ This custom loss function combines multiple loss components for multi-task learn
 - **Cross-Entropy**: Standard classification loss with class weighting
 - **Weighting**: Segmentation (1.0) + Classification (2.0) for balanced learning
 
-## X-Ray Image Validation
-
-The inference scripts include a comprehensive X-ray validation system that ensures only valid chest X-ray images are processed. This validation helps prevent false predictions and improves the reliability of the model.
-
-### Validation Criteria
-
-The `is_xray_like()` function performs multiple checks to validate X-ray images:
-
-1. **Image Dimensions**: Minimum 256x256 pixels required
-2. **Grayscale Validation**: Ensures image is grayscale (not colorful)
-3. **Brightness Range**: Validates intensity distribution (20-240 range)
-4. **Contrast Check**: Ensures sufficient contrast for X-ray analysis
-5. **Anatomical Detail**: Detects lung structures and rib patterns
-6. **Histogram Analysis**: Validates characteristic X-ray intensity distribution
-7. **Rib Structure Detection**: Identifies horizontal rib-like structures
-8. **Lung Field Characteristics**: Checks for proper contrast between lung fields and bones
-9. **Gray Level Diversity**: Ensures continuous gray scale (not binary)
-
-### Validation Implementation
-
-```python
-def is_xray_like(image_bgr: Optional[np.ndarray]) -> Tuple[bool, str]:
-    """Validate if image appears to be a chest X-ray with balanced criteria.
-    
-    Args:
-        image_bgr: Input BGR image or None
-        
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
-    # Comprehensive validation checks...
-    return True, ""  # or False, "specific error message"
-```
-
-### Error Handling
-
-When invalid images are detected, the inference scripts:
-- Print a descriptive error message explaining the validation failure
-- Skip the invalid image and continue processing other images
-- Provide specific feedback about what aspect of the image failed validation
-
-**Example Error Messages:**
-- "Image is too small. Minimum dimension should be 256 pixels for X-ray analysis."
-- "Image appears to be colorful. X-ray images must be grayscale."
-- "Image lacks anatomical detail. X-rays should show lung structures and ribs."
-- "No rib-like structures detected. X-rays should show rib outlines."
-
-### Benefits
-
-- **Improved Reliability**: Prevents false predictions on non-X-ray images
-- **Better User Experience**: Clear feedback on why images are rejected
-- **Quality Assurance**: Ensures only appropriate medical images are processed
-- **Robust Processing**: Handles various image types gracefully
-
 The model is implemented using the MONAI framework and follows a multi-head architecture pattern where a shared encoder (UNet backbone) extracts features that are then processed by two specialized heads for different tasks.
 
 ```python
@@ -361,6 +307,64 @@ This custom loss function combines multiple loss components for multi-task learn
 - **Binary Cross-Entropy**: Provides pixel-wise classification loss
 - **Cross-Entropy**: Standard classification loss with class weighting
 - **Weighting**: Segmentation (1.0) + Classification (2.0) for balanced learning
+
+
+
+## X-Ray Image Validation
+
+The inference scripts include a comprehensive X-ray validation system that ensures only valid chest X-ray images are processed. This validation helps prevent false predictions and improves the reliability of the model.
+
+### Validation Criteria
+
+The `is_xray_like()` function performs multiple checks to validate X-ray images:
+
+1. **Image Dimensions**: Minimum 256x256 pixels required
+2. **Grayscale Validation**: Ensures image is grayscale (not colorful)
+3. **Brightness Range**: Validates intensity distribution (20-240 range)
+4. **Contrast Check**: Ensures sufficient contrast for X-ray analysis
+5. **Anatomical Detail**: Detects lung structures and rib patterns
+6. **Histogram Analysis**: Validates characteristic X-ray intensity distribution
+7. **Rib Structure Detection**: Identifies horizontal rib-like structures
+8. **Lung Field Characteristics**: Checks for proper contrast between lung fields and bones
+9. **Gray Level Diversity**: Ensures continuous gray scale (not binary)
+
+### Validation Implementation
+
+```python
+def is_xray_like(image_bgr: Optional[np.ndarray]) -> Tuple[bool, str]:
+    """Validate if image appears to be a chest X-ray with balanced criteria.
+    
+    Args:
+        image_bgr: Input BGR image or None
+        
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Comprehensive validation checks...
+    return True, ""  # or False, "specific error message"
+```
+
+### Error Handling
+
+When invalid images are detected, the inference scripts:
+- Print a descriptive error message explaining the validation failure
+- Skip the invalid image and continue processing other images
+- Provide specific feedback about what aspect of the image failed validation
+
+**Example Error Messages:**
+- "Image is too small. Minimum dimension should be 256 pixels for X-ray analysis."
+- "Image appears to be colorful. X-ray images must be grayscale."
+- "Image lacks anatomical detail. X-rays should show lung structures and ribs."
+- "No rib-like structures detected. X-rays should show rib outlines."
+
+### Benefits
+
+- **Improved Reliability**: Prevents false predictions on non-X-ray images
+- **Better User Experience**: Clear feedback on why images are rejected
+- **Quality Assurance**: Ensures only appropriate medical images are processed
+- **Robust Processing**: Handles various image types gracefully
+
+
 
 ## Dataset Preprocessing and Structure
 
